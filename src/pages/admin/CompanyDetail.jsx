@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { groupFilesByYearTypeMonth } from '../../utils/fileGrouping';
+import { fileUrl } from '../../utils/fileUrl';
 
 const FILING_TYPES = ['GSTR-1','GSTR-2A','GSTR-3B','GSTR-9','GSTR-9C','CMP-08','Other'];
 const REMINDER_TYPES = ['GSTR-1','GSTR-2A','GSTR-3B','GSTR-9','GSTR-9C','CMP-08','TDS Return','Income Tax','Other'];
@@ -520,7 +521,7 @@ export default function AdminCompanyDetail() {
                                         {f.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{f.description}</div>}
                                       </div>
                                       <div className="file-actions">
-                                        <a href={`/${f.filePath}`} target="_blank" rel="noreferrer">
+                                        <a href={fileUrl(f.filePath)} target="_blank" rel="noreferrer">
                                           <button className="btn btn-secondary btn-sm"><Download size={14} /></button>
                                         </a>
                                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteFile(f._id)}><Trash2 size={14} /></button>
@@ -567,7 +568,7 @@ export default function AdminCompanyDetail() {
                       {f.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{f.description}</div>}
                     </div>
                     <div className="file-actions">
-                      <a href={`/${f.filePath}`} target="_blank" rel="noreferrer">
+                      <a href={fileUrl(f.filePath)} target="_blank" rel="noreferrer">
                         <button className="btn btn-secondary btn-sm"><Download size={14} /></button>
                       </a>
                       <button className="btn btn-danger btn-sm" onClick={() => handleDeleteFile(f._id)}><Trash2 size={14} /></button>

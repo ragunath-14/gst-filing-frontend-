@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { groupFilesByFinancialYearTypeMonth } from '../../utils/fileGrouping';
+import { fileUrl } from '../../utils/fileUrl';
 
 export default function CompanyDocuments() {
   const [files, setFiles] = useState([]);
@@ -220,7 +221,7 @@ export default function CompanyDocuments() {
                                           )}
                                         </div>
                                         <div className="file-actions">
-                                          <a href={`/${f.filePath}`} target="_blank" rel="noreferrer" download={f.originalName}>
+                                          <a href={fileUrl(f.filePath)} target="_blank" rel="noreferrer" download={f.originalName}>
                                             <button className="btn btn-primary btn-sm">
                                               <Download size={14} /> Download
                                             </button>
