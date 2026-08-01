@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import api from '../../api/axios';
 import {
-  Building2, Plus, Search, Trash2, Pencil, MapPin, Mail, Eye, EyeOff, Download
+  Building2, Plus, Search, Trash2, Pencil, MapPin, Mail, Eye, EyeOff, Download, User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -31,6 +31,7 @@ export default function AdminCompanies() {
   const [form, setForm] = useState({
     companyName: '', gstin: '', email: '', phone: '', address: '',
     state: '', businessType: 'Private Limited', returnServices: [],
+    assignedTo: '',
     loginEmail: '', loginPassword: '', loginName: '',
     panNo: '', gmailId: '', gmailPassword: '',
     gstPortalId: '', gstPortalPassword: '',
@@ -116,6 +117,7 @@ export default function AdminCompanies() {
       state: c.state || '',
       businessType: c.businessType || 'Other',
       returnServices: c.returnServices || [],
+      assignedTo: c.assignedTo || '',
       status: c.status || 'active'
     });
   };
@@ -148,6 +150,7 @@ export default function AdminCompanies() {
   const resetForm = () => setForm({
     companyName: '', gstin: '', email: '', phone: '', address: '',
     state: '', businessType: 'Private Limited', returnServices: [],
+    assignedTo: '',
     loginEmail: '', loginPassword: '', loginName: '',
     panNo: '', gmailId: '', gmailPassword: '',
     gstPortalId: '', gstPortalPassword: '',
@@ -205,6 +208,7 @@ export default function AdminCompanies() {
                       <th>Business Type</th>
                       <th>Contact</th>
                       <th>State</th>
+                      <th>Assigned To</th>
                       <th>Files</th>
                       <th>Pending</th>
                       <th>Overdue</th>
@@ -239,6 +243,9 @@ export default function AdminCompanies() {
                         </td>
                         <td>
                           {c.state ? <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={12} />{c.state}</span> : '-'}
+                        </td>
+                        <td>
+                          {c.assignedTo ? <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={12} />{c.assignedTo}</span> : '-'}
                         </td>
                         <td style={{ color: 'var(--info)', fontWeight: 600 }}>{c.fileCount ?? 0}</td>
                         <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{c.pendingReminders ?? 0}</td>
@@ -303,6 +310,10 @@ export default function AdminCompanies() {
                     <select className="form-select" value={form.businessType} onChange={set('businessType')}>
                       {BUSINESS_TYPES.map(t => <option key={t}>{t}</option>)}
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Assigned To</label>
+                    <input className="form-input" value={form.assignedTo} onChange={set('assignedTo')} placeholder="Staff member handling this company" />
                   </div>
                   <div className="form-group form-full">
                     <label className="form-label">Address</label>
@@ -466,6 +477,10 @@ export default function AdminCompanies() {
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Assigned To</label>
+                    <input className="form-input" value={editForm.assignedTo} onChange={setEditField('assignedTo')} placeholder="Staff member handling this company" />
                   </div>
                   <div className="form-group form-full">
                     <label className="form-label">Address</label>
