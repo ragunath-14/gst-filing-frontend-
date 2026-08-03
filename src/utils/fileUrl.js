@@ -1,5 +1,8 @@
-import { API_BASE_URL } from '../api/axios';
-
-// Uploaded files are served by the backend at /uploads/... — same relative-
-// vs-absolute concern as the API base URL (see api/axios.js).
-export const fileUrl = (filePath) => `${API_BASE_URL}/${filePath}`;
+/**
+ * @deprecated Import from `./downloadFile` instead.
+ *
+ * Re-exports from downloadFile.js for backward-compatibility with existing
+ * import sites. All download logic now goes through the authenticated backend
+ * proxy (downloadFile.js) rather than direct CDN links.
+ */
+export { fileUrl, resolveFileUrl, downloadFile, resolveDownloadUrl } from './downloadFile';

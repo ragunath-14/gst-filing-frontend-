@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import api from '../../api/axios';
-import { fileUrl } from '../../utils/fileUrl';
+import { downloadFile } from '../../utils/downloadFile';
 import { useAuth } from '../../context/useAuth';
 import {
   FileText, Bell, Clock, AlertTriangle, CheckCircle,
@@ -122,9 +122,13 @@ export default function CompanyDashboard() {
                             <div className="file-name">{f.originalName}</div>
                             <div className="file-meta">{f.filingType} · {f.filingPeriod} · {formatDate(f.createdAt)}</div>
                           </div>
-                          <a href={fileUrl(f.filePath)} target="_blank" rel="noreferrer">
-                            <button className="btn btn-secondary btn-sm"><Download size={14} /></button>
-                          </a>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            title="Download file"
+                            onClick={() => downloadFile(f._id, f.originalName, 'company')}
+                          >
+                            <Download size={14} />
+                          </button>
                         </div>
                       ))}
                     </div>

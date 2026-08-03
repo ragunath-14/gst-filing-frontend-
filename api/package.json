@@ -1,0 +1,10 @@
+{
+  "name": "gst-filing-blob-token-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vercel Serverless Function for Vercel Blob client-upload token generation.",
+  "dependencies": {
+    "@vercel/blob": "^0.27.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

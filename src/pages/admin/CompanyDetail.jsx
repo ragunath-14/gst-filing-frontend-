@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { groupFilesByYearTypeMonth } from '../../utils/fileGrouping';
-import { fileUrl } from '../../utils/fileUrl';
+import { downloadFile } from '../../utils/downloadFile';
+import { uploadFileToBlob, uploadFilesToBlob } from '../../utils/blobUpload';
 
 const FILING_TYPES = ['GSTR-1','GSTR-2A','GSTR-3B','GSTR-9','GSTR-9C','CMP-08','Other'];
 const REMINDER_TYPES = ['GSTR-1','GSTR-2A','GSTR-3B','GSTR-9','GSTR-9C','CMP-08','TDS Return','Income Tax','Other'];
@@ -169,15 +170,16 @@ export default function AdminCompanyDetail() {
     e.preventDefault();
     if (!selectedFile) return toast.error('Please select a file');
     setUploading(true);
-    const fd = new FormData();
-    fd.append('file', selectedFile);
-    fd.append('filingPeriod', `${uploadForm.filingMonth} ${uploadForm.filingYear}`);
-    fd.append('filingType', uploadForm.filingType);
-    fd.append('financialYear', uploadForm.financialYear);
-    fd.append('description', uploadForm.description);
     try {
-      const res = await api.post(`/admin/files/upload/${id}`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const blob = await uploadFileToBlob(selectedFile);
+      const res = await api.post(`/admin/files/upload/${id}`, {
+        blobUrl: blob.url,
+        originalName: selectedFile.name,
+        mimeType: selectedFile.type,
+        filingPeriod: `${uploadForm.filingMonth} ${uploadForm.filingYear}`,
+        filingType: uploadForm.filingType,
+        financialYear: uploadForm.financialYear,
+        description: uploadForm.description,
       });
       if (res.data.duplicate) {
         toast(`Uploaded, but this looks like a duplicate of "${res.data.duplicateOf?.originalName}" already on file for this period`, { icon: '⚠️', duration: 6000 });
@@ -194,7 +196,7 @@ export default function AdminCompanyDetail() {
         description: ''
       });
       fetchAll();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Upload failed'); }
+    } catch (err) { toast.error(err.response?.data?.detail || err.message || 'Upload failed'); }
     finally { setUploading(false); }
   };
 
@@ -222,29 +224,50 @@ export default function AdminCompanyDetail() {
     setBulkResults(null);
     setBulkSummary(null);
 
-    const fd = new FormData();
-    bulkFiles.forEach(f => fd.append('files', f));
-
     try {
-      const res = await api.post(`/admin/files/bulk-upload/${id}`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      if (res.data.success) {
-        setBulkResults(res.data.results);
-        setBulkSummary(res.data.summary);
-        if (res.data.summary.uploaded > 0) {
-          toast.success(`${res.data.summary.uploaded} file(s) auto-filed successfully!`);
-          fetchAll();
-        }
-        if (res.data.summary.errors > 0) {
-          toast.error(`${res.data.summary.errors} file(s) had errors`);
-        }
-        if (res.data.summary.duplicates > 0) {
-          toast(`${res.data.summary.duplicates} file(s) look like duplicates of files already on record`, { icon: '⚠️', duration: 6000 });
+      const uploaded = await uploadFilesToBlob(bulkFiles);
+      const results = [];
+      const okFiles = [];
+      for (const u of uploaded) {
+        if (u.error) {
+          results.push({
+            fileName: u.file.name, status: 'error', error: u.error.message || 'Upload to storage failed',
+            gstin: null, filingType: null, filingPeriod: null, financialYear: null, fileId: null,
+            duplicate: false, duplicateOf: null,
+          });
+        } else {
+          okFiles.push(u);
         }
       }
+
+      if (okFiles.length > 0) {
+        const res = await api.post(`/admin/files/bulk-upload/${id}`, {
+          files: okFiles.map(u => ({ blobUrl: u.blob.url, originalName: u.file.name, mimeType: u.file.type })),
+        });
+        results.push(...res.data.results);
+      }
+
+      const summary = {
+        total: results.length,
+        uploaded: results.filter(r => r.status === 'uploaded').length,
+        errors: results.filter(r => r.status === 'error').length,
+        duplicates: results.filter(r => r.duplicate).length,
+      };
+      setBulkResults(results);
+      setBulkSummary(summary);
+
+      if (summary.uploaded > 0) {
+        toast.success(`${summary.uploaded} file(s) auto-filed successfully!`);
+        fetchAll();
+      }
+      if (summary.errors > 0) {
+        toast.error(`${summary.errors} file(s) had errors`);
+      }
+      if (summary.duplicates > 0) {
+        toast(`${summary.duplicates} file(s) look like duplicates of files already on record`, { icon: '⚠️', duration: 6000 });
+      }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Bulk upload failed');
+      toast.error(err.response?.data?.detail || err.message || 'Bulk upload failed');
     } finally {
       setBulkUploading(false);
     }
@@ -521,9 +544,13 @@ export default function AdminCompanyDetail() {
                                         {f.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{f.description}</div>}
                                       </div>
                                       <div className="file-actions">
-                                        <a href={fileUrl(f.filePath)} target="_blank" rel="noreferrer">
-                                          <button className="btn btn-secondary btn-sm"><Download size={14} /></button>
-                                        </a>
+                                        <button
+                                          className="btn btn-secondary btn-sm"
+                                          title="Download file"
+                                          onClick={() => downloadFile(f._id, f.originalName, 'admin')}
+                                        >
+                                          <Download size={14} />
+                                        </button>
                                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteFile(f._id)}><Trash2 size={14} /></button>
                                       </div>
                                     </div>
@@ -568,9 +595,13 @@ export default function AdminCompanyDetail() {
                       {f.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{f.description}</div>}
                     </div>
                     <div className="file-actions">
-                      <a href={fileUrl(f.filePath)} target="_blank" rel="noreferrer">
-                        <button className="btn btn-secondary btn-sm"><Download size={14} /></button>
-                      </a>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        title="Download file"
+                        onClick={() => downloadFile(f._id, f.originalName, 'admin')}
+                      >
+                        <Download size={14} />
+                      </button>
                       <button className="btn btn-danger btn-sm" onClick={() => handleDeleteFile(f._id)}><Trash2 size={14} /></button>
                     </div>
                   </div>

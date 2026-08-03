@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { groupFilesByFinancialYearTypeMonth } from '../../utils/fileGrouping';
-import { fileUrl } from '../../utils/fileUrl';
+import { downloadFile } from '../../utils/downloadFile';
+import { uploadFilesToBlob } from '../../utils/blobUpload';
 
 export default function CompanyDocuments() {
   const [files, setFiles] = useState([]);
@@ -62,29 +63,50 @@ export default function CompanyDocuments() {
     setUploadResults(null);
     setUploadSummary(null);
 
-    const fd = new FormData();
-    pickedFiles.forEach(f => fd.append('files', f));
-
     try {
-      const res = await api.post('/company/files/upload', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      if (res.data.success) {
-        setUploadResults(res.data.results);
-        setUploadSummary(res.data.summary);
-        if (res.data.summary.uploaded > 0) {
-          toast.success(`${res.data.summary.uploaded} file(s) uploaded successfully!`);
-          loadFiles();
-        }
-        if (res.data.summary.errors > 0) {
-          toast.error(`${res.data.summary.errors} file(s) had errors`);
-        }
-        if (res.data.summary.duplicates > 0) {
-          toast(`${res.data.summary.duplicates} file(s) look like duplicates of files already on record`, { icon: '⚠️', duration: 6000 });
+      const uploaded = await uploadFilesToBlob(pickedFiles);
+      const results = [];
+      const okFiles = [];
+      for (const u of uploaded) {
+        if (u.error) {
+          results.push({
+            fileName: u.file.name, status: 'error', error: u.error.message || 'Upload to storage failed',
+            gstin: null, filingType: null, filingPeriod: null, financialYear: null, fileId: null,
+            duplicate: false, duplicateOf: null,
+          });
+        } else {
+          okFiles.push(u);
         }
       }
+
+      if (okFiles.length > 0) {
+        const res = await api.post('/company/files/upload', {
+          files: okFiles.map(u => ({ blobUrl: u.blob.url, originalName: u.file.name, mimeType: u.file.type })),
+        });
+        results.push(...res.data.results);
+      }
+
+      const summary = {
+        total: results.length,
+        uploaded: results.filter(r => r.status === 'uploaded').length,
+        errors: results.filter(r => r.status === 'error').length,
+        duplicates: results.filter(r => r.duplicate).length,
+      };
+      setUploadResults(results);
+      setUploadSummary(summary);
+
+      if (summary.uploaded > 0) {
+        toast.success(`${summary.uploaded} file(s) uploaded successfully!`);
+        loadFiles();
+      }
+      if (summary.errors > 0) {
+        toast.error(`${summary.errors} file(s) had errors`);
+      }
+      if (summary.duplicates > 0) {
+        toast(`${summary.duplicates} file(s) look like duplicates of files already on record`, { icon: '⚠️', duration: 6000 });
+      }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Upload failed');
+      toast.error(err.response?.data?.detail || err.message || 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -221,11 +243,12 @@ export default function CompanyDocuments() {
                                           )}
                                         </div>
                                         <div className="file-actions">
-                                          <a href={fileUrl(f.filePath)} target="_blank" rel="noreferrer" download={f.originalName}>
-                                            <button className="btn btn-primary btn-sm">
-                                              <Download size={14} /> Download
-                                            </button>
-                                          </a>
+                                          <button
+                                            className="btn btn-primary btn-sm"
+                                            onClick={() => downloadFile(f._id, f.originalName, 'company')}
+                                          >
+                                            <Download size={14} /> Download
+                                          </button>
                                         </div>
                                       </div>
                                     );

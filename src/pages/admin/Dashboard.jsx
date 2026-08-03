@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import api from '../../api/axios';
 import { useAuth } from '../../context/useAuth';
+import { uploadFileToBlob, uploadFilesToBlob } from '../../utils/blobUpload';
 import {
   Building2, Bell, AlertTriangle,
   Clock, ChevronRight, Plus, Upload,
@@ -108,16 +109,16 @@ export default function AdminDashboard() {
     if (!selectedFile) return toast.error('Please select a file');
 
     setUploading(true);
-    const fd = new FormData();
-    fd.append('file', selectedFile);
-    fd.append('filingPeriod', `${uploadForm.filingMonth} ${uploadForm.filingYear}`);
-    fd.append('filingType', uploadForm.filingType);
-    fd.append('financialYear', uploadForm.financialYear);
-    fd.append('description', uploadForm.description);
-
     try {
-      const res = await api.post(`/admin/files/upload/${uploadForm.companyId}`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const blob = await uploadFileToBlob(selectedFile);
+      const res = await api.post(`/admin/files/upload/${uploadForm.companyId}`, {
+        blobUrl: blob.url,
+        originalName: selectedFile.name,
+        mimeType: selectedFile.type,
+        filingPeriod: `${uploadForm.filingMonth} ${uploadForm.filingYear}`,
+        filingType: uploadForm.filingType,
+        financialYear: uploadForm.financialYear,
+        description: uploadForm.description,
       });
       if (res.data.duplicate) {
         toast(`Uploaded, but this looks like a duplicate of "${res.data.duplicateOf?.originalName}" already on file for this period`, { icon: '⚠️', duration: 6000 });
@@ -136,7 +137,7 @@ export default function AdminDashboard() {
       });
       refreshStats();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Upload failed');
+      toast.error(err.response?.data?.detail || err.message || 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -174,32 +175,54 @@ export default function AdminDashboard() {
     setSmartResults(null);
     setSmartSummary(null);
 
-    const fd = new FormData();
-    smartFiles.forEach(f => fd.append('files', f));
-
     try {
-      const res = await api.post('/admin/files/auto-upload', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      if (res.data.success) {
-        setSmartResults(res.data.results);
-        setSmartSummary(res.data.summary);
-        if (res.data.summary.uploaded > 0) {
-          toast.success(`${res.data.summary.uploaded} file(s) auto-uploaded successfully!`);
-          refreshStats();
-        }
-        if (res.data.summary.noMatch > 0) {
-          toast(`${res.data.summary.noMatch} file(s) need manual assignment`, { icon: '⚠️' });
-        }
-        if (res.data.summary.errors > 0) {
-          toast.error(`${res.data.summary.errors} file(s) had errors`);
-        }
-        if (res.data.summary.duplicates > 0) {
-          toast(`${res.data.summary.duplicates} file(s) look like duplicates of files already on record`, { icon: '⚠️', duration: 6000 });
+      const uploaded = await uploadFilesToBlob(smartFiles);
+      const results = [];
+      const okFiles = [];
+      for (const u of uploaded) {
+        if (u.error) {
+          results.push({
+            fileName: u.file.name, status: 'error', error: u.error.message || 'Upload to storage failed',
+            companyName: null, companyId: null, gstin: null, filingType: null, filingPeriod: null,
+            financialYear: null, fileId: null, duplicate: false, duplicateOf: null,
+          });
+        } else {
+          okFiles.push(u);
         }
       }
+
+      if (okFiles.length > 0) {
+        const res = await api.post('/admin/files/auto-upload', {
+          files: okFiles.map(u => ({ blobUrl: u.blob.url, originalName: u.file.name, mimeType: u.file.type })),
+        });
+        results.push(...res.data.results);
+      }
+
+      const summary = {
+        total: results.length,
+        uploaded: results.filter(r => r.status === 'uploaded').length,
+        noMatch: results.filter(r => r.status === 'no_match').length,
+        errors: results.filter(r => r.status === 'error').length,
+        duplicates: results.filter(r => r.duplicate).length,
+      };
+      setSmartResults(results);
+      setSmartSummary(summary);
+
+      if (summary.uploaded > 0) {
+        toast.success(`${summary.uploaded} file(s) auto-uploaded successfully!`);
+        refreshStats();
+      }
+      if (summary.noMatch > 0) {
+        toast(`${summary.noMatch} file(s) need manual assignment`, { icon: '⚠️' });
+      }
+      if (summary.errors > 0) {
+        toast.error(`${summary.errors} file(s) had errors`);
+      }
+      if (summary.duplicates > 0) {
+        toast(`${summary.duplicates} file(s) look like duplicates of files already on record`, { icon: '⚠️', duration: 6000 });
+      }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Auto-upload failed');
+      toast.error(err.response?.data?.detail || err.message || 'Auto-upload failed');
     } finally {
       setSmartUploading(false);
     }
@@ -210,24 +233,24 @@ export default function AdminDashboard() {
     const companyId = manualAssigns[resultIndex];
     if (!companyId) return toast.error('Please select a company');
 
-    // We need to re-upload the original file manually
-    const originalFile = smartFiles.find(f => f.name === result.fileName);
-    if (!originalFile) return toast.error('Original file not found. Please use manual upload.');
+    // The file is already sitting in Vercel Blob from the initial smart-upload
+    // attempt (result.filePath) — no need to re-upload it, just re-run
+    // completion against the manually-chosen company.
+    if (!result.filePath) return toast.error('Original upload not found. Please use manual upload.');
 
     setManualUploading(prev => ({ ...prev, [resultIndex]: true }));
 
-    const fd = new FormData();
-    fd.append('file', originalFile);
-    fd.append('filingPeriod', result.filingPeriod || `${new Date().toLocaleString('en-US', { month: 'long' })} ${new Date().getFullYear()}`);
-    fd.append('filingType', result.filingType || 'GSTR-3B');
-    fd.append('financialYear', result.financialYear || '');
-    fd.append('description', result.gstin && result.gstin !== 'UNKNOWN'
-      ? `Manually assigned · GSTIN from file: ${result.gstin}`
-      : 'Manually assigned');
-
     try {
-      const uploadRes = await api.post(`/admin/files/upload/${companyId}`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const uploadRes = await api.post(`/admin/files/upload/${companyId}`, {
+        blobUrl: result.filePath,
+        originalName: result.fileName,
+        mimeType: '',
+        filingPeriod: result.filingPeriod || `${new Date().toLocaleString('en-US', { month: 'long' })} ${new Date().getFullYear()}`,
+        filingType: result.filingType || 'GSTR-3B',
+        financialYear: result.financialYear || '',
+        description: result.gstin && result.gstin !== 'UNKNOWN'
+          ? `Manually assigned · GSTIN from file: ${result.gstin}`
+          : 'Manually assigned',
       });
       if (uploadRes.data.duplicate) {
         toast(`Uploaded, but this looks like a duplicate of "${uploadRes.data.duplicateOf?.originalName}" already on file for this period`, { icon: '⚠️', duration: 6000 });
@@ -247,7 +270,7 @@ export default function AdminDashboard() {
       }));
       refreshStats();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Upload failed');
+      toast.error(err.response?.data?.detail || err.message || 'Upload failed');
     } finally {
       setManualUploading(prev => ({ ...prev, [resultIndex]: false }));
     }
