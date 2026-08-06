@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
+import CompaniesExcelView from '../../components/CompaniesExcelView';
 import api from '../../api/axios';
 import {
-  Building2, Plus, Search, Trash2, Pencil, MapPin, Mail, Eye, EyeOff, Download, User
+  Building2, Plus, Search, Trash2, Pencil, MapPin, Mail, Eye, EyeOff, Table2, List, User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,7 +28,7 @@ export default function AdminCompanies() {
   const [showModal, setShowModal] = useState(false);
   const [showCreds, setShowCreds] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'sheet'
   const [form, setForm] = useState({
     companyName: '', gstin: '', email: '', phone: '', address: '',
     state: '', businessType: 'Private Limited', returnServices: [],
@@ -75,25 +76,6 @@ export default function AdminCompanies() {
       toast.error(err.response?.data?.detail || 'Failed to create company');
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await api.get('/admin/companies/export', { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `companies_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Failed to download companies Excel sheet');
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -181,8 +163,12 @@ export default function AdminCompanies() {
               <Search size={16} />
               <input placeholder="Search companies..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <button className="btn btn-secondary" onClick={handleExport} disabled={exporting} title="Download all companies as Excel">
-              <Download size={16} /> {exporting ? 'Exporting...' : 'Export Excel'}
+            <button
+              className="btn btn-secondary"
+              onClick={() => setViewMode(v => (v === 'sheet' ? 'list' : 'sheet'))}
+              title={viewMode === 'sheet' ? 'Switch to list view' : 'View companies like an Excel sheet'}
+            >
+              {viewMode === 'sheet' ? <><List size={16} /> List View</> : <><Table2 size={16} /> Excel View</>}
             </button>
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
               <Plus size={16} /> Add Company
@@ -191,7 +177,9 @@ export default function AdminCompanies() {
         </div>
 
         <div className="page-content">
-          {loading ? <div className="loading-spinner"><div className="spinner"></div></div>
+          {viewMode === 'sheet' ? (
+            <CompaniesExcelView />
+          ) : loading ? <div className="loading-spinner"><div className="spinner"></div></div>
             : filtered.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon"><Building2 size={32} /></div>

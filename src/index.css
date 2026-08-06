@@ -496,6 +496,89 @@ tr:last-child td { border-bottom: none; }
 tbody tr { transition: var(--transition); }
 tbody tr:hover { background: var(--bg-card-hover); }
 
+/* ─── EXCEL-STYLE SHEET VIEW (Companies) ────────────────────────────────── */
+.excel-sheet-wrap {
+  overflow: auto;
+  max-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.excel-sheet {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.excel-sheet th, .excel-sheet td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  white-space: nowrap;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.excel-sheet thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 2;
+}
+
+.excel-sheet .excel-row-num {
+  position: sticky;
+  left: 0;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 600;
+  z-index: 1;
+}
+
+.excel-sheet thead th.excel-row-num { z-index: 3; }
+
+.excel-sheet tbody tr:nth-child(even) td { background: var(--bg-card-hover); }
+.excel-sheet tbody tr:nth-child(even) td.excel-row-num { background: var(--bg-secondary); }
+.excel-sheet tbody tr:hover td { background: var(--info-bg); }
+.excel-sheet tbody tr:hover td.excel-row-num { background: var(--bg-secondary); }
+
+.excel-cell-editable { cursor: pointer; position: relative; }
+.excel-cell-editable:hover { outline: 1px dashed var(--accent-primary); outline-offset: -2px; }
+
+.excel-cell-editing { padding: 4px !important; }
+.excel-cell-editing input {
+  width: 100%;
+  min-width: 140px;
+  border: 1px solid var(--accent-primary);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-modal);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.excel-cell-password { font-family: monospace; letter-spacing: 1px; }
+
+.excel-cell-reveal {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 0;
+}
+.excel-cell-reveal:hover { color: var(--accent-primary); }
+
 /* ─── BADGES ─────────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
